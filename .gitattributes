@@ -1,0 +1,9 @@
+# Treat all .cpp files as C++ language
+*.cpp linguist-language=C++
+
+# Treat .hpp files as C++ (if your C++ code uses header files)
+*.hpp linguist-language=C++
+*.h linguist-language=C++
+
+# Ignore Makefile when determining the language
+Makefile linguist-language=Ignore
