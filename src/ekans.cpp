@@ -3,19 +3,26 @@
 #include "constants.h"
 #include "item.h"
 
-Ekans::Ekans() : pos({0, 0}), color(), bounds({0, 0, TILE_SIZE, TILE_SIZE}) {}
+Ekans::Ekans() : pos({0, 0}), color(), bodySize{0} {}
 
-Ekans::Ekans(Vector2 pos, Color color, Rectangle bounds)
-    : pos(pos), color(color), bounds(bounds) {}
+Ekans::Ekans(Vector2 pos, Color color, int bodySize[])
+    : pos(pos), color(color) {
+  for (int i = 0; i < MAX_TILES; i++) {
+    this->bodySize[i] = bodySize[i];
+  }
+}
 
 void Ekans::Draw() {
   DrawRectangle(pos.x * TILE_SIZE, pos.y * TILE_SIZE, TILE_SIZE, TILE_SIZE,
                 color);
 }
 
-void Ekans::Move(int dirX, int dirY) {
-  Ekans::pos.x += dirX * MOVE_SPEED;
-  Ekans::pos.y += dirY * MOVE_SPEED;
+void Ekans::Move(float dirX, float dirY) {
+  Ekans::pos.x += dirX;
+  Ekans::pos.y += dirY;
+}
 
-  std::cout << "Pos - x: " << pos.x << ", y: " << pos.y << std::endl;
+void Ekans::Grow() {
+  DrawRectangle((pos.x + 1) * TILE_SIZE, pos.y * TILE_SIZE, TILE_SIZE,
+                TILE_SIZE, color);
 }

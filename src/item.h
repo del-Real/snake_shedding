@@ -2,14 +2,12 @@
 
 class Item {
  public:
+  Vector2 pos;
+  Color color;
+
   Item();
-  Item(Vector2 pos, Color color, Rectangle bounds);
+  Item(Vector2 pos, Color color);
   ~Item();
 
   void Draw();
-
- private:
-  Vector2 pos;
-  Color color;
-  Rectangle bounds;
 };
