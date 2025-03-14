@@ -1,28 +1,30 @@
 #include "ekans.h"
-#include <iostream>
-#include "constants.h"
-#include "item.h"
 
-Ekans::Ekans() : pos({0, 0}), color(), bodySize{0} {}
+Ekans::Ekans() = default;
 
-Ekans::Ekans(Vector2 pos, Color color, int bodySize[])
-    : pos(pos), color(color) {
-  for (int i = 0; i < MAX_TILES; i++) {
-    this->bodySize[i] = bodySize[i];
-  }
+Ekans::Ekans(std::deque<Vector2> body, Color color)
+    : body(std::move(body)), color(color) {}
+
+void Ekans::Draw() const {
+    for (const auto &segment : body) {
+        DrawRectangle(segment.x * TILE_SIZE, segment.y * TILE_SIZE, TILE_SIZE,
+                      TILE_SIZE, color);
+    }
 }
 
-void Ekans::Draw() {
-  DrawRectangle(pos.x * TILE_SIZE, pos.y * TILE_SIZE, TILE_SIZE, TILE_SIZE,
-                color);
-}
+void Ekans::Move(const Vector2 &dir) {
+    if (body.empty())
+        return;
 
-void Ekans::Move(float dirX, float dirY) {
-  Ekans::pos.x += dirX;
-  Ekans::pos.y += dirY;
+    Vector2 newHead = {body.front().x + dir.x, body.front().y + dir.y};
+
+    body.push_front(newHead);
+    body.pop_back();
 }
 
 void Ekans::Grow() {
-  DrawRectangle((pos.x + 1) * TILE_SIZE, pos.y * TILE_SIZE, TILE_SIZE,
-                TILE_SIZE, color);
+    if (body.size() < 2)
+        return;
+
+    body.push_back(body.back());
 }

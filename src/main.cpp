@@ -1,187 +1,325 @@
-#include <stdio.h>
-#include <fstream>
-#include <iostream>
 #include "constants.h"
 #include "ekans.h"
 #include "item.h"
 #include "json.hpp"
 #include "raylib.h"
+#include <deque>
+#include <fstream>
+#include <iostream>
 
 using json = nlohmann::json;
 
+void loadThemeColors(const json &theme);
+void updateDirection(Vector2 &direction);
+void checkOutBounds(Ekans &ekans);
+void gameOver(Ekans &ekans, Vector2 &dir);
+
+Color lightColor, regularColor, boldColor, heavyColor;
+json colorThemes;
+size_t currentThemeIndex = 0;
+
 int main(void) {
-  const char title[] = "";
-  bool toggleGrid = false;
-  float x = 1.0f, y = 0.0f;
-  int bodySize[MAX_TILES];
+    const char *title = "";
+    bool toggleGrid = false;
 
-  InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, title);
+    InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, title);
 
-  // Load JSON file
-  std::ifstream f("src/themes.json");
-  json colorThemes = json::parse(f);
+    try {
+        // Load JSON file
+        std::ifstream f("themes.json");
+        if (!f.is_open()) {
+            std::cerr << "Failed to open themes.json file!" << std::endl;
+            std::cerr << "Current working directory: "
+                      << std::filesystem::current_path() << std::endl;
+            return 1;
+        }
 
-  // Access the "themes" array
-  auto themes = colorThemes["themes"];
+        colorThemes = json::parse(f);
 
-  // Check if there are not themes
-  if (themes.empty()) {
-    std::cerr << "No themes found!" << std::endl;
-    return 1;
-  }
+        // Access the "themes" array
+        auto themes = colorThemes["themes"];
 
-  auto& firstTheme = themes[0];  // Access the first theme
+        // Check if there are not themes
+        if (themes.empty()) {
+            std::cerr << "No themes found!" << std::endl;
+            return 1;
+        }
 
-  // Access the colors
-  Color lightColor, regularColor, boldColor, heavyColor;
+        // Load the first theme
+        loadThemeColors(themes[0]);
+    } catch (const std::exception &e) {
+        std::cerr << "Error loading themes: " << e.what() << std::endl;
+        return 1;
+    }
 
-  const auto& colors = firstTheme["colors"];
+    int score = 0;
+    char windowTitle[128]; // Buffer to hold the window title
 
-  // Assign values to the color variables
-  lightColor = {colors["light"]["r"], colors["light"]["g"],
-                colors["light"]["b"], colors["light"]["a"]};
+    std::srand(static_cast<unsigned int>(std::time(nullptr)));
 
-  regularColor = {colors["regular"]["r"], colors["regular"]["g"],
-                  colors["regular"]["b"], colors["regular"]["a"]};
+    // Random initial position
+    float initItemPosX = static_cast<float>(std::rand() % (MAX_TILES + 1));
+    float initItemPosY = static_cast<float>(std::rand() % (MAX_TILES + 1));
 
-  boldColor = {colors["bold"]["r"], colors["bold"]["g"], colors["bold"]["b"],
-               colors["bold"]["a"]};
+    Item item({initItemPosX, initItemPosY}, boldColor);
 
-  heavyColor = {colors["heavy"]["r"], colors["heavy"]["g"],
-                colors["heavy"]["b"], colors["heavy"]["a"]};
+    std::deque<Vector2> initialBody;
+    initialBody.push_back({5, 5});
+    initialBody.push_back({5, 6});
+    initialBody.push_back({5, 7});
+    Vector2 direction = {1, 0};
 
-  int score = 0;
-  char windowTitle[128];  // Buffer to hold the window title
+    Ekans ekans(initialBody, heavyColor);
+    bool alive = true;
 
-  // Random initial position
-  float initItemPosX = rand() % (MAX_TILES + 1);
-  float initItemPosY = rand() % (MAX_TILES + 1);
+    float duration = 0.1f; // Time interval for movement in seconds
+    float elapsedTime = 0.0f;
 
-  float initEkansPosX = rand() % (MAX_TILES + 1);
-  float initEkansPosY = rand() % (MAX_TILES + 1);
+    SetTargetFPS(60);
+    while (!WindowShouldClose()) {
+        //==========================
+        // Update
+        //==========================
+        float dt = GetFrameTime(); // delta time
 
-  Item item({initItemPosX, initItemPosY}, boldColor);
-  Ekans ekans({initEkansPosX, initEkansPosY}, heavyColor, bodySize);
+        // Check if movement is in progress
+        elapsedTime += dt;
 
-  float duration = 0.1f;  // Time interval for movement in seconds
-  float elapsedTime = 0.0f;
+        if (elapsedTime >= duration) {
+            // Move exactly one grid space in the specified direction
+            ekans.Move(direction);
 
-  SetTargetFPS(60);
-  while (!WindowShouldClose()) {
-    //==========================
-    // Update
-    //==========================
-    float dt = GetFrameTime();  // delta time
+            // Reset time for the next move
+            elapsedTime = 0.0f;
+        }
+
+        // Self-body collision
+        for (int i = 1; i < ekans.body.size(); i++) {
+            if (ekans.body[0].x == ekans.body[i].x &&
+                ekans.body[0].y == ekans.body[i].y) {
+                alive = false;
+                break;
+            }
+        }
+
+        // Check direction or Game Over
+        if (alive) {
+            updateDirection(direction);
+        } else {
+            gameOver(ekans, direction);
+        }
+
+        if (static_cast<int>(ekans.body[0].x) == static_cast<int>(item.pos.x) &&
+            static_cast<int>(ekans.body[0].y) == static_cast<int>(item.pos.y)) {
+
+            item = Item({static_cast<float>(rand() % (MAX_TILES + 1)),
+                         static_cast<float>(rand() % (MAX_TILES + 1))},
+                        boldColor);
+            ekans.Grow();
+            score += POINTS_EARNED;
+        }
+
+        // Check if snake is out of bounds
+        checkOutBounds(ekans);
+
+        // Update the window title
+        snprintf(windowTitle, sizeof(windowTitle), "snake \U0001F40D Score: %d",
+                 score);
+        SetWindowTitle(windowTitle);
+
+        //==========================
+        // Draw
+        //==========================
+
+        BeginDrawing();
+        ClearBackground(lightColor);
+
+        // Switch theme
+        if (IsKeyPressed(KEY_TAB)) {
+            auto themes = colorThemes["themes"];
+            currentThemeIndex = (currentThemeIndex + 1) % themes.size();
+            loadThemeColors(themes[currentThemeIndex]);
+
+            // Update item and snake colors
+            item.color = boldColor;
+            ekans.color = heavyColor;
+        }
+
+        // Show/hide grid
+        if (IsKeyPressed(KEY_G)) {
+            toggleGrid = !toggleGrid;
+        }
+
+        if (toggleGrid) {
+            for (int i = 0; i < VERTICAL_LINES; i++) {
+                DrawLineV((Vector2){(float)TILE_SIZE * i, 0},
+                          (Vector2){(float)TILE_SIZE * i, (float)SCREEN_HEIGHT},
+                          regularColor);
+            }
+
+            for (int i = 0; i < HORIZONTAL_LINES; i++) {
+                DrawLineV((Vector2){0, (float)TILE_SIZE * i},
+                          (Vector2){(float)SCREEN_WIDTH, (float)TILE_SIZE * i},
+                          regularColor);
+            }
+        }
+
+        item.Draw();
+        ekans.Draw();
+
+        if (!alive) {
+            // Draw Game Over
+            const char *gameOverText = "GAME OVER";
+            int fontSize = 42;
+            Vector2 textSize =
+                MeasureTextEx(GetFontDefault(), gameOverText, fontSize, 1);
+
+            DrawText(gameOverText, SCREEN_WIDTH / 2 - (textSize.x / 2),
+                     SCREEN_HEIGHT / 2 - (textSize.y / 2), fontSize,
+                     heavyColor);
+
+            // Draw restart info
+            const char *infoText = "Press [R] to restart";
+            int infoFontSize = 16;
+            Vector2 infoTextSize =
+                MeasureTextEx(GetFontDefault(), infoText, infoFontSize, 1);
+
+            DrawText(infoText, SCREEN_WIDTH / 2 - (infoTextSize.x / 2),
+                     SCREEN_HEIGHT / 2 - (infoTextSize.y / 2) + 50,
+                     infoFontSize, heavyColor);
+
+            // Restart game
+            if (IsKeyPressed(KEY_R)) {
+                ekans.body = initialBody;
+                direction = {1, 0};
+                alive = true;
+                score = 0;
+            }
+        }
+
+        EndDrawing();
+    }
+
+    CloseWindow();
+    return 0;
+}
+
+void loadThemeColors(const json &theme) {
+    try {
+        // Check if colors key exists
+        if (!theme.contains("colors")) {
+            std::cerr << "Theme missing 'colors' key" << std::endl;
+            return;
+        }
+
+        const auto &colors = theme["colors"];
+
+        // Helper function to safely get color component
+        auto getColorComponent =
+            [](const json &colorObj, const std::string &component,
+               unsigned char defaultValue = 255) -> unsigned char {
+            if (colorObj.contains(component)) {
+                return static_cast<unsigned char>(
+                    colorObj[component].get<int>());
+            }
+            return defaultValue;
+        };
+
+        // Safely extract colors with defaults
+        if (colors.contains("light")) {
+            auto &light = colors["light"];
+            lightColor = {
+                getColorComponent(light, "r"), getColorComponent(light, "g"),
+                getColorComponent(light, "b"), getColorComponent(light, "a")};
+        }
+
+        if (colors.contains("regular")) {
+            auto &regular = colors["regular"];
+            regularColor = {getColorComponent(regular, "r"),
+                            getColorComponent(regular, "g"),
+                            getColorComponent(regular, "b"),
+                            getColorComponent(regular, "a")};
+        }
+
+        if (colors.contains("bold")) {
+            auto &bold = colors["bold"];
+            boldColor = {
+                getColorComponent(bold, "r"), getColorComponent(bold, "g"),
+                getColorComponent(bold, "b"), getColorComponent(bold, "a")};
+        }
+
+        if (colors.contains("heavy")) {
+            auto &heavy = colors["heavy"];
+            heavyColor = {
+                getColorComponent(heavy, "r"), getColorComponent(heavy, "g"),
+                getColorComponent(heavy, "b"), getColorComponent(heavy, "a")};
+        }
+
+        std::cout << "Theme loaded: "
+                  << (theme.contains("themeName")
+                          ? theme["themeName"].get<std::string>()
+                          : "Unnamed Theme")
+                  << std::endl;
+    } catch (const std::exception &e) {
+        std::cerr << "Error loading theme colors: " << e.what() << std::endl;
+    }
+}
+
+void updateDirection(Vector2 &direction) {
 
     // Snake movement
-    if (IsKeyDown(KEY_W) || IsKeyDown(KEY_UP)) {
-      y = -1;
-      x = 0;
+    if ((IsKeyDown(KEY_W) || IsKeyDown(KEY_UP)) && direction.y != 1) {
+        // Up
+        direction.x = 0;
+        direction.y = -1;
+    } else if ((IsKeyDown(KEY_S) || IsKeyDown(KEY_DOWN)) && direction.y != -1) {
+        // Down
+        direction.x = 0;
+        direction.y = 1;
+    } else if ((IsKeyDown(KEY_D) || IsKeyDown(KEY_RIGHT)) &&
+               direction.x != -1) {
+        // Right
+        direction.x = 1;
+        direction.y = 0;
+    } else if ((IsKeyDown(KEY_A) || IsKeyDown(KEY_LEFT)) && direction.x != 1) {
+        // Left
+        direction.x = -1;
+        direction.y = 0;
+    }
+}
+
+void checkOutBounds(Ekans &ekans) {
+    if (ekans.body[0].x < 0) {
+        ekans.body[0].x = MAX_TILES;
     }
 
-    if (IsKeyDown(KEY_S) || IsKeyDown(KEY_DOWN)) {
-      y = 1;
-      x = 0;
-    }
-    if (IsKeyDown(KEY_D) || IsKeyDown(KEY_RIGHT)) {
-      x = 1;
-      y = 0;
+    else if (ekans.body[0].y < 0) {
+        ekans.body[0].y = MAX_TILES;
     }
 
-    if (IsKeyDown(KEY_A) || IsKeyDown(KEY_LEFT)) {
-      x = -1;
-      y = 0;
+    else if (ekans.body[0].x > MAX_TILES) {
+        ekans.body[0].x = 0;
     }
 
-    // Check time for movement (grid based)
-    elapsedTime += dt;
-
-    // if (elapsedTime >= duration) {
-    //   ekans.Move(x, y);
-    //   elapsedTime = 0.0f;
-    // }
-
-    if (elapsedTime >= duration) {
-      ekans.Move(x, y);
-      elapsedTime = 0.0f;
+    else if (ekans.body[0].y > MAX_TILES) {
+        ekans.body[0].y = 0;
     }
+}
 
-    // // Update interpolation progress
-    // if (elapsedTime < duration) {
-    //   float t = elapsedTime / duration;  // Normalized time (0 to 1)
-    //   playerMove = Lerp(startPlayerPos, endPlayerPos, t);
-    //   elapsedTime += dt;
-    // } else {
-    //   playerMove = endPlayerPos;
-    //   timeElapsed = 0.0f;  // Reset elapsed time for the next transition
-    // }
+void gameOver(Ekans &ekans, Vector2 &dir) {
 
-    // Check out of bounds
-    if (ekans.pos.x < 0) {
-      ekans.pos.x = MAX_TILES;
+    dir.x = 0;
+    dir.y = 0;
+
+    static float lerpFactor = 0.05f;
+
+    for (int i = 1; i < ekans.body.size(); i++) {
+
+        // Calculate direction from segment to head
+        float dx = ekans.body[0].x - ekans.body[i].x;
+        float dy = ekans.body[0].y - ekans.body[i].y;
+
+        ekans.body[i].x += dx * lerpFactor;
+        ekans.body[i].y += dy * lerpFactor;
     }
-
-    if (ekans.pos.y < 0) {
-      ekans.pos.y = MAX_TILES;
-    }
-
-    if (ekans.pos.x > MAX_TILES) {
-      ekans.pos.x = 0;
-    }
-
-    if (ekans.pos.y > MAX_TILES) {
-      ekans.pos.y = 0;
-    }
-
-    // Item collision
-    if (ekans.pos.x == item.pos.x && ekans.pos.y == item.pos.y) {
-      item.~Item();
-
-      score += POINTS;
-    }
-
-    // Update the window title
-    snprintf(windowTitle, sizeof(windowTitle), "snake \U0001F40D Score: %d",
-             score);
-    SetWindowTitle(windowTitle);
-
-    //==========================
-    // Draw
-    //==========================
-
-    BeginDrawing();
-    ClearBackground(lightColor);
-
-    // Switch theme
-    if (IsKeyPressed(KEY_TAB)) {
-    }
-
-    // Show/hide grid
-    if (IsKeyPressed(KEY_G)) {
-      toggleGrid = !toggleGrid;
-    }
-
-    if (toggleGrid) {
-      for (int i = 0; i <= SCREEN_HEIGHT / TILE_SIZE; i++) {
-        DrawLineV((Vector2){(float)TILE_SIZE * i, 0},
-                  (Vector2){(float)TILE_SIZE * i, (float)SCREEN_HEIGHT},
-                  regularColor);
-      }
-
-      for (int i = 0; i <= SCREEN_WIDTH / TILE_SIZE; i++) {
-        DrawLineV((Vector2){0, (float)TILE_SIZE * i},
-                  (Vector2){(float)SCREEN_WIDTH, (float)TILE_SIZE * i},
-                  regularColor);
-      }
-    }
-
-    item.Draw();
-    ekans.Draw();
-
-    EndDrawing();
-  }
-
-  CloseWindow();
-
-  return 0;
 }

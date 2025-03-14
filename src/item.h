@@ -1,13 +1,14 @@
+#pragma once
+
+#include "constants.h"
 #include "raylib.h"
 
 class Item {
- public:
-  Vector2 pos;
-  Color color;
+  public:
+    Vector2 pos;
+    Color color;
 
-  Item();
-  Item(Vector2 pos, Color color);
-  ~Item();
-
-  void Draw();
+    Item();
+    Item(const Vector2 &pos, Color color);
+    void Draw() const;
 };

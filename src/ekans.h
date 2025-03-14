@@ -1,16 +1,18 @@
+#pragma once
+
 #include "constants.h"
 #include "raylib.h"
+#include <deque>
 
 class Ekans {
- public:
-  Vector2 pos;
-  Color color;
-  int bodySize[MAX_TILES];
+  public:
+    std::deque<Vector2> body;
+    Color color;
 
-  Ekans();
-  Ekans(Vector2 pos, Color color, int bodySize[]);
+    Ekans();
+    Ekans(std::deque<Vector2> body, Color color);
 
-  void Draw();
-  void Move(float dirX, float dirY);
-  void Grow();
+    void Draw() const;
+    void Move(const Vector2 &dir);
+    void Grow();
 };
