@@ -12,6 +12,7 @@ using json = nlohmann::json;
 void loadThemeColors(const json &theme);
 void updateDirection(Vector2 &direction);
 void checkOutBounds(Ekans &ekans);
+Vector2 generateRandItemPos(Ekans &ekans);
 void gameOver(Ekans &ekans, Vector2 &dir);
 
 Color lightColor, regularColor, boldColor, heavyColor;
@@ -57,12 +58,7 @@ int main(void) {
 
     std::srand(static_cast<unsigned int>(std::time(nullptr)));
 
-    // Random initial position
-    float initItemPosX = static_cast<float>(std::rand() % (MAX_TILES + 1));
-    float initItemPosY = static_cast<float>(std::rand() % (MAX_TILES + 1));
-
-    Item item({initItemPosX, initItemPosY}, boldColor);
-
+    // Initial snake position
     std::deque<Vector2> initialBody;
     initialBody.push_back({5, 5});
     initialBody.push_back({5, 6});
@@ -70,9 +66,14 @@ int main(void) {
     Vector2 direction = {1, 0};
 
     Ekans ekans(initialBody, heavyColor);
+
+    // Random initial item position
+    Vector2 initItemPos = generateRandItemPos(ekans);
+    Item item({initItemPos.x, initItemPos.y}, boldColor);
+
     bool alive = true;
 
-    float duration = 0.1f; // Time interval for movement in seconds
+    float duration = 0.1f;
     float elapsedTime = 0.0f;
 
     SetTargetFPS(60);
@@ -82,7 +83,6 @@ int main(void) {
         //==========================
         float dt = GetFrameTime(); // delta time
 
-        // Check if movement is in progress
         elapsedTime += dt;
 
         if (elapsedTime >= duration) {
@@ -93,7 +93,7 @@ int main(void) {
             elapsedTime = 0.0f;
         }
 
-        // Self-body collision
+        // Check self-body collision
         for (int i = 1; i < ekans.body.size(); i++) {
             if (ekans.body[0].x == ekans.body[i].x &&
                 ekans.body[0].y == ekans.body[i].y) {
@@ -109,18 +109,33 @@ int main(void) {
             gameOver(ekans, direction);
         }
 
+        // Check if snake is out of bounds
+        checkOutBounds(ekans);
+
+        // Check item collision
         if (static_cast<int>(ekans.body[0].x) == static_cast<int>(item.pos.x) &&
             static_cast<int>(ekans.body[0].y) == static_cast<int>(item.pos.y)) {
 
-            item = Item({static_cast<float>(rand() % (MAX_TILES + 1)),
-                         static_cast<float>(rand() % (MAX_TILES + 1))},
-                        boldColor);
+            // Swap theme
+            auto themes = colorThemes["themes"];
+            size_t themeCount = themes.size();
+
+            // Generate random theme index within valid range
+            std::srand(static_cast<unsigned int>(std::time(nullptr)));
+            int randThemeIndex = std::rand() % themeCount;
+
+            loadThemeColors(themes[randThemeIndex]);
+
+            // Update item and snake colors
+            item.color = boldColor;
+            ekans.color = heavyColor;
+
+            Vector2 randItemPos = generateRandItemPos(ekans);
+            item = Item({randItemPos.x, randItemPos.y}, boldColor);
+
             ekans.Grow();
             score += POINTS_EARNED;
         }
-
-        // Check if snake is out of bounds
-        checkOutBounds(ekans);
 
         // Update the window title
         snprintf(windowTitle, sizeof(windowTitle), "snake \U0001F40D Score: %d",
@@ -133,17 +148,6 @@ int main(void) {
 
         BeginDrawing();
         ClearBackground(lightColor);
-
-        // Switch theme
-        if (IsKeyPressed(KEY_TAB)) {
-            auto themes = colorThemes["themes"];
-            currentThemeIndex = (currentThemeIndex + 1) % themes.size();
-            loadThemeColors(themes[currentThemeIndex]);
-
-            // Update item and snake colors
-            item.color = boldColor;
-            ekans.color = heavyColor;
-        }
 
         // Show/hide grid
         if (IsKeyPressed(KEY_G)) {
@@ -266,7 +270,6 @@ void loadThemeColors(const json &theme) {
 }
 
 void updateDirection(Vector2 &direction) {
-
     // Snake movement
     if ((IsKeyDown(KEY_W) || IsKeyDown(KEY_UP)) && direction.y != 1) {
         // Up
@@ -306,8 +309,31 @@ void checkOutBounds(Ekans &ekans) {
     }
 }
 
-void gameOver(Ekans &ekans, Vector2 &dir) {
+Vector2 generateRandItemPos(Ekans &ekans) {
+    Vector2 randItemPos = {static_cast<float>(rand() % (MAX_TILES + 1)),
+                           static_cast<float>(rand() % (MAX_TILES + 1))};
 
+    // Check if item collides with any snake segment
+    bool onBody = false;
+
+    do {
+        randItemPos = {static_cast<float>(rand() % (MAX_TILES + 1)),
+                       static_cast<float>(rand() % (MAX_TILES + 1))};
+
+        onBody = false;
+
+        for (const auto &segment : ekans.body) {
+            if (segment.x == randItemPos.x && segment.y == randItemPos.y) {
+                onBody = true;
+                break;
+            }
+        }
+    } while (onBody);
+
+    return randItemPos;
+}
+
+void gameOver(Ekans &ekans, Vector2 &dir) {
     dir.x = 0;
     dir.y = 0;
 
