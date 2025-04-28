@@ -1,6 +1,14 @@
-# snake
+# snake_shedding
+
+### Made with RayLib C++
 
 ![](./demo.gif)
 
-- Arrow/WASD keys to move
-- [G] show/hide grid
+### Controls
+
+| Keys             | Action           |
+|------------------|------------------|
+| WASD/Arrow keys  | Move              |
+| G                | Show/hide grid    |
+| R                | Restart game      |
+| Esc              | Exit game         |
