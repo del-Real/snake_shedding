@@ -4,7 +4,8 @@
 
 ![](./demo.gif)
 
-### Controls
+
+## Controls
 
 | Keys             | Action           |
 |------------------|------------------|
@@ -13,6 +14,8 @@
 | R                | Restart game      |
 | Esc              | Exit game         |
 
-### Color palettes
+<br>
 
-![](./color_palettes.png)
+## Color palettes
+
+<img src="./color_palettes.png" width="45%" alt="Color Palettes">
