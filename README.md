@@ -1,6 +1,6 @@
 # snake_shedding
 
-### Made with RayLib C++
+### Made with RayLib
 
 ![](./demo.gif)
 
