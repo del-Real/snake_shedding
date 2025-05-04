@@ -18,4 +18,4 @@
 
 ## Color palettes
 
-<img src="./color_palettes.png" width="45%" alt="Color Palettes">
+<img src="./color_palettes.png" width="50%" alt="Color Palettes">
