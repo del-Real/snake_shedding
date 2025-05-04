@@ -12,3 +12,7 @@
 | G                | Show/hide grid    |
 | R                | Restart game      |
 | Esc              | Exit game         |
+
+### Color palettes
+
+![](./color_palettes.png)
